@@ -12,6 +12,19 @@ import {
 } from '#app/utils/restaurants.server'
 import { cn } from '#app/utils/misc'
 import { StatusButton } from '#app/components/ui/status-button'
+import { 
+  Card, 
+  CardContent, 
+  CardFooter, 
+  CardHeader 
+} from '#app/components/ui/card'
+import { Toggle } from '#app/components/ui/toggle'
+import { 
+  MapPin, 
+  Map, 
+  Star, 
+  Users 
+} from 'lucide-react'
 
 // Zod schema for validating action form data
 const ActionSchema = z.discriminatedUnion('intent', [
@@ -142,11 +155,231 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function RestaurantsRoute() {
-  // This is a placeholder for Phase 4 - UI Routes Frontend
+  const { restaurantsWithAttendance, restaurantsNearby, filters } = useLoaderData<typeof loader>()
+  
   return (
-    <div>
-      <h1>Restaurants</h1>
-      <p>This page will be implemented in Phase 4.</p>
+    <div className="container py-8">
+      <h1 className="text-3xl font-bold mb-8">Find Restaurants</h1>
+      
+      <div className="space-y-8">
+        <DinnerPlansSection restaurants={restaurantsWithAttendance} />
+        <RestaurantListSection restaurants={restaurantsNearby} filters={filters} />
+      </div>
     </div>
+  )
+}
+
+function DinnerPlansSection({ restaurants }: { restaurants: RestaurantWithDetails[] }) {
+  return (
+    <section>
+      <h2 className="text-2xl font-bold mb-4">Dinner Plans</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {restaurants.length > 0 ? (
+          restaurants.map(restaurant => (
+            <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+          ))
+        ) : (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex items-center justify-center h-[250px]">
+            <p className="text-gray-500 text-center">Everyone is having dinner on their own 🥲</p>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function RestaurantListSection({ 
+  restaurants, 
+  filters 
+}: { 
+  restaurants: RestaurantWithDetails[], 
+  filters: Record<string, any> 
+}) {
+  return (
+    <section>
+      <h2 className="text-2xl font-bold mb-4">Restaurants Nearby</h2>
+      
+      <Filters currentFilters={filters} />
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+        {restaurants.map(restaurant => (
+          <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function Filters({ currentFilters }: { currentFilters: Record<string, any> }) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  
+  const updateFilter = (key: string, value: string | null) => {
+    const newParams = new URLSearchParams(searchParams)
+    
+    if (value === null) {
+      newParams.delete(key)
+    } else {
+      newParams.set(key, value)
+    }
+    
+    setSearchParams(newParams, { preventScrollReset: true, replace: true })
+  }
+  
+  const isActive = (key: string, value: string) => {
+    return searchParams.get(key) === value
+  }
+  
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <span className="text-sm font-medium py-2">Distance:</span>
+        {[1, 2, 5, 10].map(distance => (
+          <Toggle
+            key={`distance-${distance}`}
+            pressed={isActive('distance', distance.toString())}
+            onPressedChange={(pressed) => {
+              updateFilter('distance', pressed ? distance.toString() : null)
+            }}
+            className="flex-1"
+          >
+            {distance}mi
+          </Toggle>
+        ))}
+      </div>
+      
+      <div className="flex flex-wrap gap-2">
+        <span className="text-sm font-medium py-2">Rating:</span>
+        {[1, 2, 3, 4].map(rating => (
+          <Toggle
+            key={`rating-${rating}`}
+            pressed={isActive('rating', rating.toString())}
+            onPressedChange={(pressed) => {
+              updateFilter('rating', pressed ? rating.toString() : null)
+            }}
+            className="flex-1"
+          >
+            {'⭐'.repeat(rating)}
+          </Toggle>
+        ))}
+      </div>
+      
+      <div className="flex flex-wrap gap-2">
+        <span className="text-sm font-medium py-2">Price:</span>
+        {[1, 2, 3, 4].map(price => (
+          <Toggle
+            key={`price-${price}`}
+            pressed={isActive('price', price.toString())}
+            onPressedChange={(pressed) => {
+              updateFilter('price', pressed ? price.toString() : null)
+            }}
+            className="flex-1"
+          >
+            {'$'.repeat(price)}
+          </Toggle>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RestaurantCard({ restaurant }: { restaurant: RestaurantWithDetails }) {
+  const fetcher = useFetcher()
+  
+  const isJoining = fetcher.state === 'submitting' && 
+    fetcher.formData?.get('intent') === 'join'
+  
+  const isLeaving = fetcher.state === 'submitting' && 
+    fetcher.formData?.get('intent') === 'leave'
+  
+  return (
+    <Card className="overflow-hidden">
+      <div className="relative h-40 bg-gray-200">
+        {restaurant.photoRef ? (
+          <img 
+            src={`/resources/maps/photo?photoRef=${restaurant.photoRef}`}
+            alt={restaurant.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+            <span className="text-gray-400">No image</span>
+          </div>
+        )}
+        
+        <div className="absolute top-2 right-2 flex gap-2">
+          {restaurant.rating ? (
+            <span className="bg-white/90 text-black px-2 py-1 rounded-md text-sm flex items-center">
+              <Star className="w-4 h-4 mr-1 text-yellow-500" />
+              {restaurant.rating.toFixed(1)}
+            </span>
+          ) : null}
+          
+          {restaurant.priceLevel ? (
+            <span className="bg-white/90 text-black px-2 py-1 rounded-md text-sm">
+              {'$'.repeat(restaurant.priceLevel)}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      
+      <CardHeader className="pb-2">
+        <h3 className="font-bold text-lg">{restaurant.name}</h3>
+      </CardHeader>
+      
+      <CardContent className="pb-2">
+        <div className="flex items-center text-sm text-gray-500 mb-1">
+          <MapPin className="w-4 h-4 mr-1" />
+          <span>{restaurant.distance} mi</span>
+        </div>
+        
+        {restaurant.mapsUrl && (
+          <a 
+            href={restaurant.mapsUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center text-sm text-blue-500 hover:underline"
+          >
+            <Map className="w-4 h-4 mr-1" />
+            <span>Directions</span>
+          </a>
+        )}
+        
+        <div className="flex items-center text-sm mt-2">
+          <Users className="w-4 h-4 mr-1" />
+          <span>{restaurant.attendeeCount} attending</span>
+        </div>
+      </CardContent>
+      
+      <CardFooter>
+        <fetcher.Form method="post" className="w-full">
+          {restaurant.isUserAttending ? (
+            <>
+              <input type="hidden" name="intent" value="leave" />
+              <StatusButton
+                type="submit"
+                status={isLeaving ? 'pending' : 'idle'}
+                className="w-full"
+                variant="destructive"
+              >
+                {isLeaving ? 'Leaving...' : 'Leave'}
+              </StatusButton>
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="intent" value="join" />
+              <input type="hidden" name="restaurantId" value={restaurant.id} />
+              <StatusButton
+                type="submit"
+                status={isJoining ? 'pending' : 'idle'}
+                className="w-full"
+              >
+                {isJoining ? 'Joining...' : 'Join'}
+              </StatusButton>
+            </>
+          )}
+        </fetcher.Form>
+      </CardFooter>
+    </Card>
   )
 } 
