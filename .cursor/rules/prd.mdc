@@ -205,9 +205,17 @@ And remove any `json({})` wrappers
 
 # Phase 5 - Deployment
 
-2. Connect to custom domain
+1. Connect to custom domain
 	- Domain is dinnernotonyourown.com
 	- Domain is provided by CloudFlare
 	- We need to add A, AAAA, CNAME and Acme challenge records
 	- Set up the root domain and the @www. subdomain
 	- Use `fly certs` instead of `fly domains` (it is deprecated)
+
+# Phase 6 - Tests & Mocks
+
+1. Add a mock for the Google API
+2.  Add an e2e test for
+	- Filters
+	- Joining a restaurant
+	- Leaving a restaurant
